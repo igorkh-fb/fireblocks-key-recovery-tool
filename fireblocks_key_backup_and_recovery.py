@@ -1,23 +1,22 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import os
-from utils import recover
-import argparse
-import getpass
-import sys
+from utils import recover, non_custodial_wallet
+from utils.public_key_verification import create_short_checksum, create_and_pop_qr
+
 from termcolor import colored
-import inquirer
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives import serialization
-from utils.public_key_verification import create_short_checksum
-from utils.public_key_verification import create_and_pop_qr
+
 import animation
+import inquirer
+import os
 
 CREATE_RECOVERY_KEY_PAIR = 'CREATE_RECOVERY_KEY_PAIR'
 VERIFY_PUBLIC_KEY = 'VERIFY_PUBLIC_KEY'
 VERIFY_RECOVERY_PACKAGE = 'VERIFY_RECOVERY_PACKAGE'
 REVEAL_PRV_BACKUP_KEY = 'REVEAL_PRV_BACKUP_KEY'
+RECOVER_NCW_KEY_SHARE = 'RECOVER_NCW_KEY_SHARE'
 EXIT_MENU = 'EXIT_MENU'
 
 DEFAULT_KEY_FILE_PREFIX = 'fb-recovery'
@@ -33,6 +32,7 @@ menu_options = {
     VERIFY_PUBLIC_KEY: 'Verify the public recovery key to create a backup via the console',
     VERIFY_RECOVERY_PACKAGE: 'Verify the key backup package',
     REVEAL_PRV_BACKUP_KEY: 'Reveal the private workspace keys',
+    RECOVER_NCW_KEY_SHARE: 'Recover non-custodial wallets cloud share',
     EXIT_MENU: 'Exit'
 }
 
@@ -119,7 +119,7 @@ def is_pem_public_key(key_str):
         return True
     except (ValueError, TypeError, AttributeError):
         return False
-    
+
 def verify_public_key():
     print('Workspace admins can approve the key backup using the Fireblocks mobile app.\n')
 
@@ -198,7 +198,6 @@ def recover_keys(show_xprv=False):
         print('Backupfile: {} not found.'.format(backup))
         exit(- 1)
 
-    
     try:
         privkeys = recover.restore_key_and_chaincode(
             backup, key, passphrase, key_pass, mobile_key, mobile_key_pass)
@@ -237,6 +236,53 @@ def reveal_backup_private_key():
         recover_keys(True)
 
 
+def wallet_id_validator(answers, current):
+    return not current or non_custodial_wallet.is_valid_wallet_id(current)
+
+
+def recover_end_user_wallet_share():
+    backup = inquirer.text(message='Enter the backup zip file name')
+    if not os.path.exists(backup):
+        print('Backupfile: {} not found.'.format(backup))
+        exit(-1)
+
+    key = inquirer.text(message='Enter the RSA private key file name or press enter for default', default=DEFAULT_KEY_FILE_PREFIX + '-private.pem')
+    if not os.path.exists(key):
+        print('RSA key: {} not found.'.format(key))
+        exit(-1)
+
+    with open(key, 'r') as _key:
+        key_file = _key.readlines()
+        if 'ENCRYPTED' in key_file[0] or 'ENCRYPTED' in key_file[1]:
+            key_pass = inquirer.password(message='Please enter recovery RSA private key passphrase')
+        else:
+            key_pass = None
+
+    try:
+        wallet_master = non_custodial_wallet.recover_wallet_master(backup, key, key_pass)
+
+        wallet_id = inquirer.text(message="Please enter wallet ID", validate=wallet_id_validator)
+        while wallet_id:
+            chaincode = non_custodial_wallet.derive_non_custodial_wallet_asset_chaincode(wallet_master, wallet_id)
+            ecdsa_shares = non_custodial_wallet.derive_non_custodial_wallet_cloud_shares(wallet_master, wallet_id, "MPC_CMP_ECDSA_SECP256K1")
+
+            print("Chain code: {}".format(chaincode.hex()))
+            for cosigner_id in wallet_master.master_key_for_cosigner.keys():
+                print("Cloud co-signer {} ECDSA key share: {}".format(cosigner_id, ecdsa_shares[cosigner_id].hex()))
+            print()
+
+            wallet_id = inquirer.text(message="Please enter another wallet ID or press enter to finish", validate=wallet_id_validator)
+    except recover.RecoveryErrorRSAKeyImport:
+        print(colored("Failed to import RSA Key. " + colored("Please make sure you have the RSA passphrase entered correctly.", attrs = ["bold"]), "cyan"))
+        exit(-1)
+    except non_custodial_wallet.MissingWalletMasterKeyId:
+        print(colored("Wallet master key not found in backup ZIP. " + colored("Please make sure the backup file was generated for a workspace fully enrolled with the Fireblocks Non Custodial Wallet offering.", attrs = ["bold"]), "cyan"))
+        exit(-1)
+    except non_custodial_wallet.InvalidWalletId:
+        print(colored("Wallet ID entered with incorrect format. " + colored("It is expected to be a lower case UUID v4 string.", attrs = ["bold"]), "cyan"))
+        exit(-1)
+
+
 def pop_main_menu():
     return inquirer.list_input(message=colored(
         "What do you want to do?", "green"),
@@ -259,10 +305,12 @@ def main():
             recover_keys()
         elif menu_option == menu_options[REVEAL_PRV_BACKUP_KEY]:
             reveal_backup_private_key()
+        elif menu_option == menu_options[RECOVER_NCW_KEY_SHARE]:
+            recover_end_user_wallet_share()
         elif menu_option == menu_options[EXIT_MENU]:
             cont = False
         else:
-            print(colored('Not a valid choise', 'red'))
+            print(colored('Not a valid choice', 'red'))
             exit(-1)
 
     print(colored('Goodbye', 'yellow'))
