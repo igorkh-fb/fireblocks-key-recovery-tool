@@ -3,9 +3,10 @@ on: [push, pull_request]
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
+        os: ['ubuntu-latest', 'macos-13']
         python-version: ['3.9', '3.10']
       fail-fast: false
 
@@ -23,12 +24,10 @@ jobs:
           pip install -r requirements-dev.txt
       - name: Test with pytest
         run: |
-          pytest test/ --junitxml=junit/test-results-${{ matrix.python-version }}.xml
-        env:
-          OPENSSL_CONF: '${{ github.workspace }}/test/openssl.cnf'
+          pytest test/ --junitxml=junit/test-results-${{ matrix.os }}-${{ matrix.python-version }}.xml
       - name: Upload pytest test results
         uses: actions/upload-artifact@v3
         with:
-          name: pytest-results-${{ matrix.python-version }}
-          path: junit/test-results-${{ matrix.python-version }}.xml
+          name: pytest-results-${{ matrix.os }}-${{ matrix.python-version }}
+          path: junit/test-results-${{ matrix.os }}-${{ matrix.python-version }}.xml
         if: ${{ always() }}
