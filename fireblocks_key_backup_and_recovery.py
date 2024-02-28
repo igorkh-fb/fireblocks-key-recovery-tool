@@ -289,6 +289,7 @@ def recover_end_user_wallet_shares():
     for wallet_id in get_all_wallet_ids(wallets_file, wallets):
         chaincode = non_custodial_wallet.derive_non_custodial_wallet_asset_chaincode(wallet_master, wallet_id)
         ecdsa_shares = non_custodial_wallet.derive_non_custodial_wallet_cloud_shares(wallet_master, wallet_id, 'MPC_CMP_ECDSA_SECP256K1')
+        eddsa_shares = non_custodial_wallet.derive_non_custodial_wallet_cloud_shares(wallet_master, wallet_id, 'MPC_CMP_EDDSA_ED25519')
 
         result[wallet_id] = {
             'chaincode': chaincode.hex(),
@@ -298,7 +299,8 @@ def recover_end_user_wallet_shares():
         for cosigner_id in wallet_master.master_key_for_cosigner.keys():
             result[wallet_id]['shares'].append({
                 'cosigner': cosigner_id,
-                'MPC_CMP_ECDSA_SECP256K1': ecdsa_shares[cosigner_id].hex()
+                'MPC_CMP_ECDSA_SECP256K1': ecdsa_shares[cosigner_id].hex(),
+                'MPC_CMP_EDDSA_ED25519': eddsa_shares[cosigner_id].hex()
             })
 
     output_file = inquirer.text(message='Enter the name for the result JSON file', validate=lambda a, current: bool(current))

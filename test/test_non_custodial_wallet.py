@@ -51,6 +51,16 @@ def test_derive_cloud_shares_basic_ecdsa(basic_wallet_master):
     assert result["21926ecc-4a8a-4614-bbac-7c591aa7efdd"].hex().upper() == "165270C168AE45C8980A44179622C521FFE5A5251191ACE11ECDF52BF63D6FA0"
 
 
+def test_derive_cloud_shares_basic_ecdsa(basic_wallet_master):
+    result = non_custodial_wallet.derive_non_custodial_wallet_cloud_shares(basic_wallet_master, "2d33e419-4c84-44b1-9d9a-3598f96642b0", "MPC_EDDSA_ED25519")
+    assert result.keys() == { "21926ecc-4a8a-4614-bbac-7c591aa7efdd" }
+    assert result["21926ecc-4a8a-4614-bbac-7c591aa7efdd"].hex().upper() == "0BF6D18AF6FA94A1D1063A5131A3C72C5479A3E3FAF8D7749F328A75BC564EB7"
+
+    result = non_custodial_wallet.derive_non_custodial_wallet_cloud_shares(basic_wallet_master, "69c4e0de-946f-45db-954d-4d890a5af0fe", "MPC_EDDSA_ED25519")
+    assert result.keys() == { "21926ecc-4a8a-4614-bbac-7c591aa7efdd" }
+    assert result["21926ecc-4a8a-4614-bbac-7c591aa7efdd"].hex().upper() == "0944CAEA9979C6033FD774026CD7DFEAA61804A3DD1F681CD85767AA30E112EB"
+
+
 def test_derive_cloud_shares_bad_wallet_id(basic_wallet_master):
     with pytest.raises(non_custodial_wallet.InvalidWalletId):
         non_custodial_wallet.derive_non_custodial_wallet_cloud_shares(basic_wallet_master, "", "MPC_ECDSA_SECP256K1")

@@ -2,6 +2,7 @@
 from utils.curve import secp256k1
 from utils.errors import RecoveryError, RecoveryErrorMetadataNotFound, RecoveryErrorRSAKeyImport, RecoveryErrorIncorrectRSAKey
 from utils.metadata import parse_metadata_file
+from utils import ed25519
 
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import PKCS1_OAEP
@@ -58,6 +59,8 @@ def _get_cloud_player_id(cosigner_id: str):
 def _get_algorithm_field_mod(algorithm: str) -> int:
     if algorithm in ("MPC_ECDSA_SECP256K1", "MPC_CMP_ECDSA_SECP256K1"):
         return secp256k1.q
+    elif algorithm in ("MPC_EDDSA_ED25519", "MPC_CMP_EDDSA_ED25519"):
+        return ed25519.l
     else:
         raise UnsupportedAlgorithmError(algorithm)
 
